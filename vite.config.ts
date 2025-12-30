@@ -16,5 +16,4 @@ export default defineConfig({
     allowedHosts: true,
   },
   base: './',
-  assetsInclude: ['**/*.txt'],
 });

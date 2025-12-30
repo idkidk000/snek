@@ -21,6 +21,7 @@
   "private": true,
   "scripts": {
     "build": "tsc -b && vite build",
+    "deploy": "npm install && npm run lint && cd dist && git switch deploy && npm run build && git add . && git status",
     "dev": "vite --port 3000 --host 0.0.0.0",
     "format": "biome format --write",
     "lint": "biome lint --reporter=summary",

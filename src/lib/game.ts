@@ -109,10 +109,14 @@ export class Game {
   #food = new PointSet();
   #snake = new Snake();
   #score = 0;
-  constructor(
-    public readonly width: number,
-    public readonly height: number
-  ) {
+  #dead = false;
+  #wrap = true;
+  turn = Turn.None;
+  #speed = 1;
+  paused = false;
+  #size = 12;
+
+  constructor() {
     this.reset();
   }
   get length(): number {
@@ -121,18 +125,47 @@ export class Game {
   get score(): number {
     return this.#score;
   }
+  get dead(): boolean {
+    return this.#dead;
+  }
+  get wrap(): boolean {
+    return this.#wrap;
+  }
+  get stepTime(): number {
+    return 50 * (11 - this.speed);
+  }
+  get speed(): number {
+    return this.#speed;
+  }
+  get size(): number {
+    return this.#size;
+  }
+  set size(value: number) {
+    this.#size = Math.max(this.#size, value);
+  }
+  set speed(value: number) {
+    this.#speed = Math.min(10, Math.max(1, value));
+  }
+  set wrap(value: boolean) {
+    this.#wrap = value;
+  }
   reset(): void {
     this.#food.clear();
     this.#snake.clear();
     this.#score = 0;
-    this.#snake.set({ x: Math.floor(this.width / 2), y: Math.floor(this.width / 2) }, Heading.North);
+    this.#dead = false;
+    this.turn = Turn.None;
+    this.paused = false;
+    this.#speed = 1;
+    this.#size = 12;
+    this.#snake.set({ x: Math.floor(this.#size / 2), y: Math.floor(this.#size / 2) }, Heading.North);
     this.addFood();
   }
   addFood(): void {
     while (true) {
       const food: Point = {
-        x: Math.round(Math.random() * (this.width - 1)),
-        y: Math.round(Math.random() * (this.height - 1)),
+        x: Math.round(Math.random() * (this.#size - 1)),
+        y: Math.round(Math.random() * (this.#size - 1)),
       };
       if (this.#food.has(food)) continue;
       if (this.#snake.has(food)) continue;
@@ -140,28 +173,36 @@ export class Game {
       return;
     }
   }
-  move(turn: Turn, speed: number) {
+  step(): boolean {
     const [head, heading] = this.#snake.head;
-    const nextHeading: Heading = modP(heading + turn, 4);
-    const nextHead: Point = {
-      x: modP(nextHeading === Heading.East ? head.x + 1 : nextHeading === Heading.West ? head.x - 1 : head.x, this.width),
-      y: modP(nextHeading === Heading.North ? head.y - 1 : nextHeading === Heading.South ? head.y + 1 : head.y, this.height),
-    };
-    if (this.#snake.has(nextHead)) throw new Error('crashed');
+    const nextHeading: Heading = modP(heading + this.turn, 4);
+    this.turn = Turn.None;
+    const nextHead: Point = this.#wrap
+      ? {
+          x: modP(head.x + (nextHeading === Heading.East ? 1 : nextHeading === Heading.West ? -1 : 0), this.#size),
+          y: modP(head.y + (nextHeading === Heading.North ? -1 : nextHeading === Heading.South ? 1 : 0), this.#size),
+        }
+      : {
+          x: head.x + (nextHeading === Heading.East ? 1 : nextHeading === Heading.West ? -1 : 0),
+          y: head.y + (nextHeading === Heading.North ? -1 : nextHeading === Heading.South ? 1 : 0),
+        };
+    if ((!this.#wrap && (nextHead.x < 0 || nextHead.x >= this.#size || nextHead.y < 0 || nextHead.y >= this.#size)) || this.#snake.has(nextHead)) {
+      this.#dead = true;
+      return false;
+    }
     this.#snake.set(nextHead, nextHeading);
     if (this.#food.has(nextHead)) {
-      this.#score += this.#snake.size * speed;
+      this.#score += this.#snake.size * this.speed;
       this.#food.delete(nextHead);
-      this.addFood();
+      if (this.#food.size === 0) this.addFood();
     } else this.#snake.delete(this.#snake.tail[0]);
+    return true;
   }
   *values(): Generator<[Point, ObjectType], undefined, undefined> {
-    for (const point of this.#snake.keys()) {
-      // console.debug('values snake', point);
+    for (const point of this.#snake.keys().toArray().toReversed()) {
       yield [point, ObjectType.Player];
     }
     for (const point of this.#food.keys()) {
-      // console.debug('values food', point);
       yield [point, ObjectType.Food];
     }
   }
@@ -172,8 +213,8 @@ export class Game {
       head: this.#snake.head,
       tail: this.#snake.tail,
       score: this.#score,
-      width: this.width,
-      height: this.height,
+      size: this.#size,
+      dead: this.dead,
     };
   }
 }

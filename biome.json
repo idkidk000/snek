@@ -49,6 +49,12 @@
         "useExhaustiveDependencies": {
           "level": "warn",
           "options": {
+            "hooks": [
+              {
+                "name": "useGame",
+                "stableResult": true
+              }
+            ],
             "reportMissingDependenciesArray": true
           }
         }
