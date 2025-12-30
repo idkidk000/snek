@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light dark;
+}
+
+@theme {
+  --color-foreground: light-dark(#000, #fff);
+  --color-background: light-dark(#fff, #000);
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground transition-colors duration-200;
+  }
+  div#root {
+    @apply h-dvh w-dvw;
+  }
+  .pixel {
+    image-rendering: pixelated;
+  }
+}
