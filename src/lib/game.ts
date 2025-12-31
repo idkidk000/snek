@@ -41,6 +41,9 @@ export class PointSet {
   get size(): number {
     return this.#set.size;
   }
+  [Symbol.iterator]() {
+    return this.keys();
+  }
 }
 
 export enum Heading {
@@ -78,6 +81,9 @@ export class PointMap<Item> {
   get size(): number {
     return this.#map.size;
   }
+  [Symbol.iterator]() {
+    return this.entries();
+  }
 }
 
 export class Snake extends PointMap<Heading> {
@@ -92,6 +98,10 @@ export class Snake extends PointMap<Heading> {
     if (typeof result === 'undefined') throw new Error('oh no');
     return result;
   }
+  *segments(): MapIterator<[Point, Heading, segment: number]> {
+    let i = 0;
+    for (const [point, heading] of super.entries().toArray().toReversed()) yield [point, heading, i++];
+  }
 }
 
 export enum Turn {
@@ -105,17 +115,23 @@ export enum ObjectType {
   Food,
 }
 
+export enum FoodType {
+  Standard,
+  Special,
+}
+
 export class Game {
-  #food = new PointSet();
+  #food = new PointMap<FoodType>();
   #snake = new Snake();
   #score = 0;
   #dead = false;
-  #wrap = true;
+  #wrap = false;
   turn = Turn.None;
   #speed = 1;
   paused = false;
   #size = 12;
-
+  #grow = false;
+  labels = false;
   constructor() {
     this.reset();
   }
@@ -158,8 +174,11 @@ export class Game {
     this.paused = false;
     this.#speed = 1;
     this.#size = 12;
-    this.#snake.set({ x: Math.floor(this.#size / 2), y: Math.floor(this.#size / 2) }, Heading.North);
+    this.#snake.set({ x: 0, y: this.#size - 1 }, Heading.North);
+    this.#snake.set({ x: 0, y: this.#size - 2 }, Heading.North);
     this.addFood();
+    this.#grow = false;
+    this.labels = false;
   }
   addFood(): void {
     while (true) {
@@ -169,7 +188,7 @@ export class Game {
       };
       if (this.#food.has(food)) continue;
       if (this.#snake.has(food)) continue;
-      this.#food.add(food);
+      this.#food.set(food, Math.random() > 0.9 ? FoodType.Special : FoodType.Standard);
       return;
     }
   }
@@ -191,20 +210,19 @@ export class Game {
       return false;
     }
     this.#snake.set(nextHead, nextHeading);
-    if (this.#food.has(nextHead)) {
+    if (this.#grow || this.#food.has(nextHead)) {
       this.#score += this.#snake.size * this.speed;
       this.#food.delete(nextHead);
       if (this.#food.size === 0) this.addFood();
+      this.#grow = false;
     } else this.#snake.delete(this.#snake.tail[0]);
     return true;
   }
-  *values(): Generator<[Point, ObjectType], undefined, undefined> {
-    for (const point of this.#snake.keys().toArray().toReversed()) {
-      yield [point, ObjectType.Player];
-    }
-    for (const point of this.#food.keys()) {
-      yield [point, ObjectType.Food];
-    }
+  food(): ReturnType<(typeof PointMap)['prototype']['entries']> {
+    return this.#food.entries();
+  }
+  snake(): ReturnType<(typeof Snake)['prototype']['segments']> {
+    return this.#snake.segments();
   }
   dump() {
     return {
@@ -216,5 +234,8 @@ export class Game {
       size: this.#size,
       dead: this.dead,
     };
+  }
+  grow() {
+    this.#grow = true;
   }
 }

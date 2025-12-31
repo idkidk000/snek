@@ -22,6 +22,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       else if (event.key === 'r') gameRef.current.reset();
       else if (event.key === 'w') gameRef.current.wrap = !gameRef.current.wrap;
       else if (event.key === '*') ++gameRef.current.size;
+      else if (event.key === 'g') gameRef.current.grow();
+      else if (event.key === 'l') gameRef.current.labels=!gameRef.current.labels;
     }, { signal: controller.signal });
     return () => controller.abort();
   }, []);
