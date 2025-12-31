@@ -1,19 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { MobileControls } from '@/components/mobile-controls';
 import { useGame } from '@/hooks/game';
-import { FoodType, type Game, Heading } from '@/lib/game';
-
-// biome-ignore format: no
-const foodColours: [h:number, s:number, l:number][][] = [
-  [ [0, 100, 50], [39, 100, 50], [60, 100, 50], [120, 100, 25], [300, 100, 25], ],
-  [ [57, 69, 47], [0, 0, 80], [274, 40, 47], [0, 0, 13], ],
-  [ [196, 54, 54], [349, 33, 65], [0, 0, 80], [349, 33, 65], [196, 54, 54], ],
-  [ [276, 58, 68], [0, 0, 100], [94, 62, 31], ],
-  [ [340, 100, 73], [293, 85, 45], [0, 0, 16], [235, 60, 47], ],
-  [ [0, 0, 73], [0, 0, 100], [92, 84, 74], [0, 0, 100], [0, 0, 73], ],
-  [ [346, 85, 71], [344, 75, 80], [0, 0, 81], [191, 88, 73], [194, 94, 60], [54, 100, 78], ],
-  [ [0, 0, 0], [0, 0, 65], [0, 0, 100], [300, 100, 25], ],
-  [ [330, 100, 55], [51, 100, 50], [200, 100, 55], ],
-];
+import { colourSchemes, type Game, Heading } from '@/lib/game';
+import { lerp } from '@/lib/utils';
 
 function drawFood(context: CanvasRenderingContext2D, game: Game, scale: number): void {
   context.lineWidth = scale / 20;
@@ -26,8 +15,8 @@ function drawFood(context: CanvasRenderingContext2D, game: Game, scale: number):
     .toSorted(([a], [b]) => a.y - b.y || a.x - b.x)) {
     const gradient = context.createLinearGradient(x * scale, y * scale, (x + 1) * scale, (y + 1) * scale);
     let hue = 30;
-    if (type === FoodType.Special) {
-      const colours = foodColours[(x * y) % foodColours.length];
+    if (typeof type === 'number') {
+      const colours = colourSchemes[type];
       const width = 0.7 / colours.length;
       for (const [i, colour] of colours.entries()) {
         gradient.addColorStop(i * width + 0.15, `hsl(${colour[0]} ${colour[1]}% ${colour[2]}%)`);
@@ -77,7 +66,6 @@ function drawText(context: CanvasRenderingContext2D, text: string[], size: strin
   context.font = `bold ${size} system-ui`;
   context.textBaseline = 'middle';
   const textWithMetrics = text.map((item) => ({ text: item, metrics: context.measureText(item) }));
-  console.log(textWithMetrics);
   const [maxAscent, maxDescent] = textWithMetrics.reduce(
     (acc, item) => {
       acc[0] = Math.max(acc[0], item.metrics.fontBoundingBoxAscent);
@@ -130,17 +118,33 @@ function drawSnake(context: CanvasRenderingContext2D, game: Game, scale: number)
 
   context.shadowBlur = scale / 4;
   context.lineWidth = scale / 20;
-  const hueStep = Math.min(10, 50 / snake.length);
-  context.strokeStyle = `hsl(250 50% 50%)`;
   const eyes = [new Path2D(), new Path2D()];
+
+  const tailColour = game.colourScheme[game.colourScheme.length - 1];
+  context.strokeStyle = `hsl(${tailColour[0]} 50% 50%)`;
 
   for (let i = 0; i < snake.length; ++i) {
     const [{ x, y }, heading] = snake[i];
     const [, prevHeading] = i > 0 ? snake[i - 1] : [null, null];
     const fill = new Path2D();
     let outline: Path2D | null = null;
-    context.fillStyle = `hsl(${250 + hueStep * i} 100% 50%)`;
-    context.shadowColor = `hsl(${250 + hueStep * i} 100% 50% / 50%)`;
+    // const colourIndex = (game.colourScheme.length / (snake.length + 1)) * i;
+    const colourIndex = (i / (snake.length - 1)) * (game.colourScheme.length - 1);
+    const thisColour = game.colourScheme[Math.floor(colourIndex)];
+    const nextColour = game.colourScheme[Math.ceil(colourIndex)];
+    const colour = [
+      lerp(
+        thisColour[0],
+        Math.abs(thisColour[0] - nextColour[0]) <= 180 ? nextColour[0] : thisColour[0] > 180 ? nextColour[0] + 360 : nextColour[0] - 360,
+        1,
+        colourIndex % 1
+      ),
+      lerp(thisColour[1], nextColour[1], 1, colourIndex % 1),
+      lerp(thisColour[2], nextColour[2], 1, colourIndex % 1),
+    ];
+
+    context.fillStyle = `hsl(${colour[0]} ${colour[1]}% ${colour[2]}%)`;
+    context.shadowColor = `hsl(${colour[0]} ${colour[1]}% ${colour[2]}% / 50%)`;
     if (i === 0) {
       // head
       if (heading === Heading.North) {
@@ -235,7 +239,7 @@ function drawSnake(context: CanvasRenderingContext2D, game: Game, scale: number)
       );
   }
 
-  context.fillStyle = `hsl(300 50% 50%)`;
+  context.fillStyle = `hsl(${tailColour[0]} 50% 20%)`;
   for (const eye of eyes) {
     context.fill(eye);
     context.stroke(eye);
@@ -281,8 +285,8 @@ export default function App() {
       if (gameRef.current.dead || gameRef.current.paused)
         drawText(
           context,
-          [gameRef.current.dead ? 'Game over' : 'Paused', 'Score', gameRef.current.score.toLocaleString()],
-          '15dvh',
+          [gameRef.current.dead ? 'Game over' : 'Paused', 'Score', gameRef.current.score.toLocaleString(), `Speed ${gameRef.current.speed}`],
+          `${2 * scale}px`,
           scale,
           gameRef.current.size / 2 - 0.5,
           gameRef.current.size / 2 - 0.5
@@ -300,8 +304,8 @@ export default function App() {
   const handleClick = useCallback(() => setReload(Math.random()), []);
 
   return (
-    <div className='grid grid-cols-[1fr_auto_1fr] gap-4 p-4 size-full text-center'>
-      <div className='grid grid-cols-[auto_auto] gap-4 my-auto overflow-hidden'>
+    <div className='flex flex-col lg:flex-row gap-4 lg:p-4 size-full lg:size-auto'>
+      <div className='hidden lg:grid grid-cols-[auto,auto] gap-4 my-auto overflow-hidden grow basis-0 order-12 lg:order-1'>
         <div className='contents'>
           <span>
             <kbd>a</kbd> / <kbd>left</kbd>
@@ -322,9 +326,21 @@ export default function App() {
         </div>
         <div className='contents'>
           <span>
+            <kbd>q</kbd>
+          </span>
+          <span>Add special food</span>
+        </div>
+        <div className='contents'>
+          <span>
             <kbd>g</kbd>
           </span>
           <span>Grow</span>
+        </div>
+        <div className='contents'>
+          <span>
+            <kbd>c</kbd>
+          </span>
+          <span>Next colour</span>
         </div>
         <div className='contents'>
           <span>
@@ -374,25 +390,29 @@ export default function App() {
           </button>
         </div>
       </div>
-      <canvas className='aspect-square overflow-hidden size-full border-4 border-white' ref={canvasRef} />
-      <div className='grid grid-cols-[auto_auto] gap-4 my-auto text-2xl overflow-hidden'>
-        <div className='contents'>
+      <canvas
+        className='aspect-square overflow-hidden size-[100vmin] lg:size-[min(calc(100vmin-2em),calc(100dvw-30em))] border-4 border-white order-1 lg:order-2 shrink-0'
+        ref={canvasRef}
+      />
+      <div className='hidden lg:flex flex-col gap-4 my-auto text-2xl overflow-hidden grow basis-0 order-12 lg:order-3 *:flex *:flex-wrap *:gap-x-4 **:overflow-hidden **:wrap-normal'>
+        <div>
           <h3 className='font-semibold'>Score</h3>
           <div ref={scoreElemRef}></div>
         </div>
-        <div className='contents'>
+        <div>
           <h3 className='font-semibold'>Length</h3>
           <div ref={lengthElemRef}></div>
         </div>
-        <div className='contents'>
+        <div>
           <h3 className='font-semibold'>Speed</h3>
           <div ref={speedElemRef}></div>
         </div>
-        <div className='contents'>
+        <div>
           <h3 className='font-semibold'>Wrap</h3>
           <div ref={wrapElemRef}></div>
         </div>
       </div>
+      <MobileControls className='order-1 lg:order-12 grow' />
     </div>
   );
 }

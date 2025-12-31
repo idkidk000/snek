@@ -1,5 +1,19 @@
 import { modP } from '@/lib/utils';
 
+// biome-ignore format: no
+export const colourSchemes: [h:number, s:number, l:number][][] = [
+  [ [329, 98, 42], [220, 100, 33], ],
+  [ [0, 100, 50], [39, 100, 50], [60, 100, 50], [120, 100, 25], [300, 100, 25], ],
+  [ [57, 69, 47], [0, 0, 80], [274, 40, 47], [0, 0, 13], ],
+  [ [196, 54, 54], [349, 33, 65], [0, 0, 80], [349, 33, 65], [196, 54, 54], ],
+  [ [276, 58, 68], [0, 0, 100], [94, 62, 31], ],
+  [ [340, 100, 73], [293, 85, 45], [0, 0, 16], [235, 60, 47], ],
+  [ [0, 0, 73], [0, 0, 100], [92, 84, 74], [0, 0, 100], [0, 0, 73], ],
+  [ [346, 85, 71], [344, 75, 80], [0, 0, 81], [191, 88, 73], [194, 94, 60], [54, 100, 78], ],
+  [ [0, 0, 0], [0, 0, 65], [0, 0, 100], [300, 100, 25], ],
+  [ [330, 100, 55], [51, 100, 50], [200, 100, 55], ],
+];
+
 export interface Point {
   x: number;
   y: number;
@@ -16,33 +30,6 @@ class PointPacker {
   unpack(packed: number): Point {
     if (typeof packed !== 'number') throw new Error('packed is undefined', { cause: packed });
     return { x: packed >> 16, y: packed & 0xffff };
-  }
-}
-
-export class PointSet {
-  #set = new Set<number>();
-  #packer = new PointPacker();
-  add(key: Point): this {
-    this.#set.add(this.#packer.pack(key));
-    return this;
-  }
-  clear(): void {
-    this.#set.clear();
-  }
-  delete(key: Point): boolean {
-    return this.#set.delete(this.#packer.pack(key));
-  }
-  keys(): SetIterator<Point> {
-    return this.#set.keys().map(this.#packer.unpack);
-  }
-  has(key: Point): boolean {
-    return this.#set.has(this.#packer.pack(key));
-  }
-  get size(): number {
-    return this.#set.size;
-  }
-  [Symbol.iterator]() {
-    return this.keys();
   }
 }
 
@@ -77,6 +64,9 @@ export class PointMap<Item> {
   }
   has(key: Point): boolean {
     return this.#map.has(this.#packer.pack(key));
+  }
+  get(key: Point): Item | undefined {
+    return this.#map.get(this.#packer.pack(key));
   }
   get size(): number {
     return this.#map.size;
@@ -115,13 +105,8 @@ export enum ObjectType {
   Food,
 }
 
-export enum FoodType {
-  Standard,
-  Special,
-}
-
 export class Game {
-  #food = new PointMap<FoodType>();
+  #food = new PointMap<number | null>();
   #snake = new Snake();
   #score = 0;
   #dead = false;
@@ -132,6 +117,7 @@ export class Game {
   #size = 12;
   #grow = false;
   labels = false;
+  #colour = 0;
   constructor() {
     this.reset();
   }
@@ -179,8 +165,10 @@ export class Game {
     this.addFood();
     this.#grow = false;
     this.labels = false;
+    this.#colour = 0;
   }
-  addFood(): void {
+  addFood(special?: boolean): void {
+    const colour = special || (typeof special === 'undefined' && Math.random() > 0.9) ? Math.round(Math.random() * 1000) % colourSchemes.length : null;
     while (true) {
       const food: Point = {
         x: Math.round(Math.random() * (this.#size - 1)),
@@ -188,7 +176,7 @@ export class Game {
       };
       if (this.#food.has(food)) continue;
       if (this.#snake.has(food)) continue;
-      this.#food.set(food, Math.random() > 0.9 ? FoodType.Special : FoodType.Standard);
+      this.#food.set(food, colour);
       return;
     }
   }
@@ -211,14 +199,16 @@ export class Game {
     }
     this.#snake.set(nextHead, nextHeading);
     if (this.#grow || this.#food.has(nextHead)) {
-      this.#score += this.#snake.size * this.speed;
+      const foodAt = this.#food.get(nextHead);
+      this.#colour = foodAt ?? 0;
+      this.#score += this.#snake.size * this.speed * (typeof foodAt === 'number' ? 10 : 1);
       this.#food.delete(nextHead);
       if (this.#food.size === 0) this.addFood();
       this.#grow = false;
     } else this.#snake.delete(this.#snake.tail[0]);
     return true;
   }
-  food(): ReturnType<(typeof PointMap)['prototype']['entries']> {
+  food(): ReturnType<(typeof PointMap<number | null>)['prototype']['entries']> {
     return this.#food.entries();
   }
   snake(): ReturnType<(typeof Snake)['prototype']['segments']> {
@@ -237,5 +227,15 @@ export class Game {
   }
   grow() {
     this.#grow = true;
+  }
+  get colour() {
+    return this.#colour;
+  }
+  get colourScheme() {
+    return colourSchemes[this.#colour];
+  }
+  nextColour() {
+    if (this.#colour === colourSchemes.length - 1) this.#colour = 0;
+    else ++this.#colour;
   }
 }

@@ -15,6 +15,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       if (event.key === 'a' || event.key === 'ArrowLeft') gameRef.current.turn = Turn.Left;
       else if (event.key === 'd' || event.key === 'ArrowRight') gameRef.current.turn = Turn.Right;
       else if (event.key === 'f') gameRef.current.addFood();
+      else if (event.key === 'q') gameRef.current.addFood(true);
       else if (event.key === 'u') console.info(gameRef.current.dump());
       else if (event.key === '+') ++gameRef.current.speed
       else if (event.key === '-') --gameRef.current.speed
@@ -24,6 +25,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       else if (event.key === '*') ++gameRef.current.size;
       else if (event.key === 'g') gameRef.current.grow();
       else if (event.key === 'l') gameRef.current.labels=!gameRef.current.labels;
+      else if (event.key === 'c') gameRef.current.nextColour()
     }, { signal: controller.signal });
     return () => controller.abort();
   }, []);
