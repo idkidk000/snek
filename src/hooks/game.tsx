@@ -12,6 +12,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
     const controller = new AbortController();
     // biome-ignore format: no
     document.addEventListener('keydown', (event) => {
+      if (event.shiftKey && event.key==='F') gameRef.current.fillFood();
+      if (event.shiftKey && event.key==='Q') gameRef.current.fillFood(true);
       if (event.key === 'a' || event.key === 'ArrowLeft') gameRef.current.turn = Turn.Left;
       else if (event.key === 'd' || event.key === 'ArrowRight') gameRef.current.turn = Turn.Right;
       else if (event.key === 'f') gameRef.current.addFood();
@@ -25,7 +27,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       else if (event.key === '*') ++gameRef.current.size;
       else if (event.key === 'g') gameRef.current.grow();
       else if (event.key === 'l') gameRef.current.labels=!gameRef.current.labels;
-      else if (event.key === 'c') gameRef.current.nextColour()
+      else if (event.key === 'c') gameRef.current.nextColour();
+      else if (event.key === 't') gameRef.current.auto=!gameRef.current.auto;
     }, { signal: controller.signal });
     return () => controller.abort();
   }, []);

@@ -1,18 +1,18 @@
 import { modP } from '@/lib/utils';
 
 // biome-ignore format: no
-export const colourSchemes: [h:number, s:number, l:number][][] = [
-  [ [329, 98, 42], [220, 100, 33], ],
-  [ [0, 100, 50], [39, 100, 50], [60, 100, 50], [120, 100, 25], [300, 100, 25], ],
-  [ [57, 69, 47], [0, 0, 80], [274, 40, 47], [0, 0, 13], ],
-  [ [196, 54, 54], [349, 33, 65], [0, 0, 80], [349, 33, 65], [196, 54, 54], ],
-  [ [276, 58, 68], [0, 0, 100], [94, 62, 31], ],
-  [ [340, 100, 73], [293, 85, 45], [0, 0, 16], [235, 60, 47], ],
-  [ [0, 0, 73], [0, 0, 100], [92, 84, 74], [0, 0, 100], [0, 0, 73], ],
-  [ [346, 85, 71], [344, 75, 80], [0, 0, 81], [191, 88, 73], [194, 94, 60], [54, 100, 78], ],
-  [ [0, 0, 0], [0, 0, 65], [0, 0, 100], [300, 100, 25], ],
-  [ [330, 100, 55], [51, 100, 50], [200, 100, 55], ],
-];
+export const colourSchemes: [ l: number, a: number, b: number ][][] = [
+  [ [ 46, 74, 1 ], [ 46, 74, 1 ], [ 45, 43, -26 ], [ 29, 32, -64 ], [ 29, 32, -64 ] ],
+  [ [ 53, 80, 67 ], [ 75, 24, 79 ], [ 97, -22, 94 ], [ 46, -52, 50 ], [ 30, 59, -36 ] ],
+  [ [ 77, -13, 72 ], [ 82, -0, 0 ], [ 41, 41, -43 ], [ 13, -0, 0 ] ],
+  [ [ 64, -17, -25 ], [ 63, 24, 3 ], [ 82, -0, 0 ], [ 63, 24, 3 ], [ 64, -17, -25 ] ],
+  [ [ 62, 39, -40 ], [ 100, -0, 0 ], [ 48, -35, 45 ] ],
+  [ [ 67, 57, 1 ], [ 47, 80, -59 ], [ 16, -0, 0 ], [ 33, 41, -70 ] ],
+  [ [ 76, -0, 0 ], [ 100, -0, 0 ], [ 90, -37, 48 ], [ 100, -0, 0 ], [ 76, -0, 0 ] ],
+  [ [ 65, 51, 7 ], [ 76, 31, 1 ], [ 83, -0, 0 ], [ 84, -23, -20 ], [ 77, -23, -33 ], [ 95, -10, 50 ] ],
+  [ [ 0, 0, 0 ], [ 68, -0, 0 ], [ 100, -0, 0 ], [ 30, 59, -36 ] ],
+  [ [ 56, 83, -2 ], [ 87, -3, 87 ], [ 69, -10, -48 ] ]
+]
 
 export interface Point {
   x: number;
@@ -100,11 +100,6 @@ export enum Turn {
   None = 0,
 }
 
-export enum ObjectType {
-  Player,
-  Food,
-}
-
 export class Game {
   #food = new PointMap<number | null>();
   #snake = new Snake();
@@ -118,6 +113,8 @@ export class Game {
   #grow = false;
   labels = false;
   #colour = 0;
+  auto = false;
+  #nextTurn: Turn | null = null;
   constructor() {
     this.reset();
   }
@@ -143,7 +140,7 @@ export class Game {
     return this.#size;
   }
   set size(value: number) {
-    this.#size = Math.max(this.#size, value);
+    this.#size = Math.ceil(Math.max(this.#size, value) / 2) * 2;
   }
   set speed(value: number) {
     this.#speed = Math.min(10, Math.max(1, value));
@@ -151,24 +148,27 @@ export class Game {
   set wrap(value: boolean) {
     this.#wrap = value;
   }
-  reset(): void {
+  reset(partial?: boolean): void {
     this.#food.clear();
     this.#snake.clear();
-    this.#score = 0;
+    if (!partial) this.#score = 0;
     this.#dead = false;
     this.turn = Turn.None;
-    this.paused = false;
-    this.#speed = 1;
-    this.#size = 12;
+    if (partial) this.paused = !this.auto;
+    else this.paused = false;
+    if (!partial) this.#speed = 1;
+    if (!partial) this.#size = 12;
     this.#snake.set({ x: 0, y: this.#size - 1 }, Heading.North);
     this.#snake.set({ x: 0, y: this.#size - 2 }, Heading.North);
-    this.addFood();
+    for (let i = 0; i < 5; ++i) this.addFood();
     this.#grow = false;
-    this.labels = false;
-    this.#colour = 0;
+    if (!partial) this.#colour = 0;
+    if (!partial) this.auto = false;
+    this.#nextTurn = null;
   }
   addFood(special?: boolean): void {
     const colour = special || (typeof special === 'undefined' && Math.random() > 0.9) ? Math.round(Math.random() * 1000) % colourSchemes.length : null;
+    if (this.#food.size + this.#snake.size === this.size * this.size) return;
     while (true) {
       const food: Point = {
         x: Math.round(Math.random() * (this.#size - 1)),
@@ -180,8 +180,39 @@ export class Game {
       return;
     }
   }
+  fillFood(special?: boolean): void {
+    for (let x = 0; x < this.size; ++x)
+      for (let y = 0; y < this.size; ++y)
+        this.#food.set(
+          { x, y },
+          special || (typeof special === 'undefined' && Math.random() > 0.9) ? Math.round(Math.random() * 1000) % colourSchemes.length : null
+        );
+  }
   step(): boolean {
     const [head, heading] = this.#snake.head;
+    if (this.auto) {
+      if (this.#nextTurn !== null) {
+        this.turn = this.#nextTurn;
+        this.#nextTurn = null;
+      } else if (head.y === 0 && head.x < this.size - 1) {
+        this.turn = Turn.Right;
+        this.#nextTurn = Turn.Right;
+      } else if (head.y === this.size - 2 && head.x < this.size - 2 && head.x > 0) {
+        this.turn = Turn.Left;
+        this.#nextTurn = Turn.Left;
+      } else if (head.x === this.size - 1 && head.y === this.size - 1) {
+        this.turn = Turn.Right;
+        this.#nextTurn = Turn.None;
+      } else if (head.x === 0 && head.y === this.size - 1) {
+        this.turn = Turn.Right;
+        this.#nextTurn = Turn.None;
+      }
+      console.debug(
+        head,
+        this.turn === Turn.Left ? 'l' : this.turn === Turn.Right ? 'r' : 'f',
+        this.#nextTurn === Turn.Left ? 'l' : this.#nextTurn === Turn.Right ? 'r' : this.#nextTurn === Turn.None ? 'f' : this.#nextTurn
+      );
+    }
     const nextHeading: Heading = modP(heading + this.turn, 4);
     this.turn = Turn.None;
     const nextHead: Point = this.#wrap
@@ -200,12 +231,17 @@ export class Game {
     this.#snake.set(nextHead, nextHeading);
     if (this.#grow || this.#food.has(nextHead)) {
       const foodAt = this.#food.get(nextHead);
-      this.#colour = foodAt ?? 0;
       this.#score += this.#snake.size * this.speed * (typeof foodAt === 'number' ? 10 : 1);
       this.#food.delete(nextHead);
-      if (this.#food.size === 0) this.addFood();
       this.#grow = false;
+      if (typeof foodAt !== 'undefined') this.addFood();
+      if (typeof foodAt === 'number') this.#colour = foodAt;
     } else this.#snake.delete(this.#snake.tail[0]);
+    if (this.#snake.size === this.size * this.size) {
+      ++this.speed;
+      ++this.size;
+      this.reset(true);
+    }
     return true;
   }
   food(): ReturnType<(typeof PointMap<number | null>)['prototype']['entries']> {

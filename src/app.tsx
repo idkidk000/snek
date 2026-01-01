@@ -14,23 +14,24 @@ function drawFood(context: CanvasRenderingContext2D, game: Game, scale: number):
     .toArray()
     .toSorted(([a], [b]) => a.y - b.y || a.x - b.x)) {
     const gradient = context.createLinearGradient(x * scale, y * scale, (x + 1) * scale, (y + 1) * scale);
-    let hue = 30;
+    let alpha = 45;
+    let beta = 75;
     if (typeof type === 'number') {
       const colours = colourSchemes[type];
       const width = 0.7 / colours.length;
       for (const [i, colour] of colours.entries()) {
-        gradient.addColorStop(i * width + 0.15, `hsl(${colour[0]} ${colour[1]}% ${colour[2]}%)`);
-        gradient.addColorStop((i + 1) * width + 0.15, `hsl(${colour[0]} ${colour[1]}% ${colour[2]}%)`);
+        gradient.addColorStop(i * width + 0.15, `lab(${colour[0]} ${colour[1]} ${colour[2]})`);
+        gradient.addColorStop((i + 1) * width + 0.15, `lab(${colour[0]} ${colour[1]} ${colour[2]})`);
       }
-      hue = colours[0][0];
-      context.strokeStyle = `hsl(${hue} 50% 25%)`;
+      [, alpha, beta] = colours[0];
+      context.strokeStyle = `lab(25 ${alpha} ${beta})`;
     } else {
-      gradient.addColorStop(0, `hsl(${hue} 100% 50%)`);
-      gradient.addColorStop(1, `hsl(${hue} 100% 30%)`);
-      context.strokeStyle = `hsl(${hue} 100% 25%)`;
+      gradient.addColorStop(0, `lab(68 ${alpha} ${beta})`);
+      gradient.addColorStop(1, `lab(40 ${alpha} ${beta})`);
+      context.strokeStyle = `lab(25 ${alpha} ${beta})`;
     }
     context.fillStyle = gradient;
-    context.shadowColor = `hsl(${hue} 100% 50% / 50%)`;
+    context.shadowColor = `lab(50 ${alpha} ${beta} / 50%)`;
 
     // main
     context.beginPath();
@@ -39,7 +40,7 @@ function drawFood(context: CanvasRenderingContext2D, game: Game, scale: number):
     context.stroke();
 
     // dots
-    context.fillStyle = `hsl(${hue} 100% 25% / 50%)`;
+    context.fillStyle = `lab(25 ${alpha} ${beta} / 50%)`;
     context.beginPath();
     context.arc((x + 0.33) * scale, (y + 0.33) * scale, scale * 0.08, 0, Math.PI * 2, false);
     context.fill();
@@ -59,7 +60,7 @@ function drawFood(context: CanvasRenderingContext2D, game: Game, scale: number):
 
 function drawText(context: CanvasRenderingContext2D, text: string[], size: string, scale: number, x: number, y: number): void {
   context.fillStyle = '#fff';
-  context.shadowColor = 'hsl(300 100% 50% / 50%)';
+  context.shadowColor = 'lab(60 94 -61 / 50%)';
   context.shadowOffsetX = 0;
   context.shadowOffsetY = scale / 10;
   context.shadowBlur = scale / 4;
@@ -83,8 +84,8 @@ function drawText(context: CanvasRenderingContext2D, text: string[], size: strin
 
 function drawGrid(context: CanvasRenderingContext2D, game: Game, scale: number): void {
   const gradient = context.createLinearGradient(0, 0, 0, game.size * scale);
-  gradient.addColorStop(0, 'hsl(270 100% 50% / 50%)');
-  gradient.addColorStop(1, 'hsl(330 100% 50% / 50%)');
+  gradient.addColorStop(0, 'lab(39 75 -95 / 50%)');
+  gradient.addColorStop(1, 'lab(56 83 6 / 50%)');
   context.strokeStyle = gradient;
   context.lineWidth = 1;
   context.beginPath();
@@ -119,32 +120,29 @@ function drawSnake(context: CanvasRenderingContext2D, game: Game, scale: number)
   context.shadowBlur = scale / 4;
   context.lineWidth = scale / 20;
   const eyes = [new Path2D(), new Path2D()];
+  const outlines: Path2D[] = [];
+  const fills: [fillStyle: string, path: Path2D][] = [];
 
   const tailColour = game.colourScheme[game.colourScheme.length - 1];
-  context.strokeStyle = `hsl(${tailColour[0]} 50% 50%)`;
+  context.strokeStyle = `lab(40 ${tailColour[1]} ${tailColour[2]})`;
+
+  function lerpColour(segment: number): [l: number, a: number, b: number] {
+    const index = Math.min(game.colourScheme.length - 1, (segment / (snake.length - 1)) * (game.colourScheme.length - 1));
+    const prevStop = game.colourScheme[Math.floor(index)];
+    const nextStop = game.colourScheme[Math.ceil(index)];
+    const mix = index % 1;
+    const colour = [lerp(prevStop[0], nextStop[0], 1, mix), lerp(prevStop[1], nextStop[1], 1, mix), lerp(prevStop[2], nextStop[2], 1, mix)];
+    return colour as [l: number, a: number, b: number];
+  }
 
   for (let i = 0; i < snake.length; ++i) {
     const [{ x, y }, heading] = snake[i];
     const [, prevHeading] = i > 0 ? snake[i - 1] : [null, null];
     const fill = new Path2D();
-    let outline: Path2D | null = null;
-    // const colourIndex = (game.colourScheme.length / (snake.length + 1)) * i;
-    const colourIndex = (i / (snake.length - 1)) * (game.colourScheme.length - 1);
-    const thisColour = game.colourScheme[Math.floor(colourIndex)];
-    const nextColour = game.colourScheme[Math.ceil(colourIndex)];
-    const colour = [
-      lerp(
-        thisColour[0],
-        Math.abs(thisColour[0] - nextColour[0]) <= 180 ? nextColour[0] : thisColour[0] > 180 ? nextColour[0] + 360 : nextColour[0] - 360,
-        1,
-        colourIndex % 1
-      ),
-      lerp(thisColour[1], nextColour[1], 1, colourIndex % 1),
-      lerp(thisColour[2], nextColour[2], 1, colourIndex % 1),
-    ];
-
-    context.fillStyle = `hsl(${colour[0]} ${colour[1]}% ${colour[2]}%)`;
-    context.shadowColor = `hsl(${colour[0]} ${colour[1]}% ${colour[2]}% / 50%)`;
+    const colour = lerpColour(i);
+    // shadow pass requires an opaque fill
+    context.fillStyle = '#000';
+    context.shadowColor = `lab(${colour[0]} ${colour[1]} ${colour[2]} / 50%)`;
     if (i === 0) {
       // head
       if (heading === Heading.North) {
@@ -172,7 +170,7 @@ function drawSnake(context: CanvasRenderingContext2D, game: Game, scale: number)
         eyes[0].arc((x + 0.33) * scale, (y + 0.25) * scale, scale / 10, 0, Math.PI * 2, false);
         eyes[1].arc((x + 0.33) * scale, (y + 0.75) * scale, scale / 10, 0, Math.PI * 2, false);
       }
-      outline = fill;
+      outlines.push(fill);
     } else if (i === snake.length - 1) {
       // tail
       if (prevHeading === Heading.North) {
@@ -192,10 +190,10 @@ function drawSnake(context: CanvasRenderingContext2D, game: Game, scale: number)
         fill.lineTo((x + 1) * scale, (y + 0.5) * scale);
         fill.lineTo(x * scale, (y + 1) * scale);
       }
-      outline = fill;
+      outlines.push(fill);
     } else {
       // body
-      outline = new Path2D();
+      const outline = new Path2D();
       if ((prevHeading === Heading.North && heading === Heading.North) || (prevHeading === Heading.South && heading === Heading.South)) {
         fill.rect(x * scale, y * scale - 1, scale, scale + 2);
         outline.moveTo(x * scale, y * scale - 1);
@@ -225,9 +223,10 @@ function drawSnake(context: CanvasRenderingContext2D, game: Game, scale: number)
         fill.lineTo(x * scale - 1, (y + 1) * scale + 1);
         outline.arc(x * scale, (y + 1) * scale, scale, Math.PI * 1.5, Math.PI * 2.0, false);
       }
+      outlines.push(outline);
     }
     context.fill(fill);
-    context.stroke(outline);
+    fills.push([`lab(${colour[0]} ${colour[1]} ${colour[2]})`, fill]);
     if (game.labels)
       drawText(
         context,
@@ -239,7 +238,19 @@ function drawSnake(context: CanvasRenderingContext2D, game: Game, scale: number)
       );
   }
 
-  context.fillStyle = `hsl(${tailColour[0]} 50% 20%)`;
+  // draw fills on top of all shadows
+  context.shadowColor = '#0000';
+  context.shadowOffsetX = 0;
+  context.shadowOffsetY = 0;
+  context.shadowBlur = 0;
+  for (const [fillStyle, fill] of fills) {
+    context.fillStyle = fillStyle;
+    context.fill(fill);
+  }
+
+  for (const outline of outlines) context.stroke(outline);
+
+  context.fillStyle = `lab(20 ${tailColour[1]} ${tailColour[2]})`;
   for (const eye of eyes) {
     context.fill(eye);
     context.stroke(eye);
@@ -254,6 +265,8 @@ export default function App() {
   const lengthElemRef = useRef<HTMLDivElement>(null);
   const speedElemRef = useRef<HTMLDivElement>(null);
   const wrapElemRef = useRef<HTMLDivElement>(null);
+  const sizeElemRef = useRef<HTMLDivElement>(null);
+  const autoElemRef = useRef<HTMLDivElement>(null);
   const [reload, setReload] = useState(0);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies(reload): deliberate
@@ -294,6 +307,8 @@ export default function App() {
       if (scoreElemRef.current) scoreElemRef.current.innerText = gameRef.current.score.toLocaleString();
       if (lengthElemRef.current) lengthElemRef.current.innerText = gameRef.current.length.toLocaleString();
       if (speedElemRef.current) speedElemRef.current.innerText = gameRef.current.speed.toLocaleString();
+      if (sizeElemRef.current) sizeElemRef.current.innerText = gameRef.current.size.toLocaleString();
+      if (autoElemRef.current) autoElemRef.current.innerText = gameRef.current.auto ? 'Auto' : 'Manual';
       if (wrapElemRef.current) wrapElemRef.current.innerText = gameRef.current.wrap ? 'Wrap' : 'Limit';
     }
     requestAnimationFrame(step);
@@ -374,6 +389,12 @@ export default function App() {
         </div>
         <div className='contents'>
           <span>
+            <kbd>t</kbd>
+          </span>
+          <span>Toggle auto</span>
+        </div>
+        <div className='contents'>
+          <span>
             <kbd>l</kbd>
           </span>
           <span>Toggle labels</span>
@@ -406,6 +427,14 @@ export default function App() {
         <div>
           <h3 className='font-semibold'>Speed</h3>
           <div ref={speedElemRef}></div>
+        </div>
+        <div>
+          <h3 className='font-semibold'>Size</h3>
+          <div ref={sizeElemRef}></div>
+        </div>
+        <div>
+          <h3 className='font-semibold'>Auto</h3>
+          <div ref={autoElemRef}></div>
         </div>
         <div>
           <h3 className='font-semibold'>Wrap</h3>
