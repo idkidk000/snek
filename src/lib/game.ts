@@ -139,6 +139,9 @@ export class Game {
   get size(): number {
     return this.#size;
   }
+  get minFood(): number {
+    return Math.ceil(this.#size ** 2 / 100);
+  }
   set size(value: number) {
     this.#size = Math.ceil(Math.max(this.#size, value) / 2) * 2;
   }
@@ -160,19 +163,19 @@ export class Game {
     if (!partial) this.#size = 12;
     this.#snake.set({ x: 0, y: this.#size - 1 }, Heading.North);
     this.#snake.set({ x: 0, y: this.#size - 2 }, Heading.North);
-    for (let i = 0; i < 5; ++i) this.addFood();
+    this.addFood();
     this.#grow = false;
     if (!partial) this.#colour = 0;
     if (!partial) this.auto = false;
     this.#nextTurn = null;
   }
   addFood(special?: boolean): void {
-    const colour = special || (typeof special === 'undefined' && Math.random() > 0.9) ? Math.round(Math.random() * 1000) % colourSchemes.length : null;
-    if (this.#food.size + this.#snake.size === this.size * this.size) return;
-    while (true) {
+    const colour = special || (typeof special === 'undefined' && Math.random() > 0.9) ? Math.floor(Math.random() * (colourSchemes.length - 0.0001)) : null;
+    if (this.#food.size + this.#snake.size >= this.size ** 2) return;
+    for (let i = 0; i < 1000; i++) {
       const food: Point = {
-        x: Math.round(Math.random() * (this.#size - 1)),
-        y: Math.round(Math.random() * (this.#size - 1)),
+        x: Math.floor(Math.random() * (this.#size - 0.0001)),
+        y: Math.floor(Math.random() * (this.#size - 0.0001)),
       };
       if (this.#food.has(food)) continue;
       if (this.#snake.has(food)) continue;
@@ -182,11 +185,13 @@ export class Game {
   }
   fillFood(special?: boolean): void {
     for (let x = 0; x < this.size; ++x)
-      for (let y = 0; y < this.size; ++y)
+      for (let y = 0; y < this.size; ++y) {
+        if (this.#snake.has({ x, y })) continue;
         this.#food.set(
           { x, y },
-          special || (typeof special === 'undefined' && Math.random() > 0.9) ? Math.round(Math.random() * 1000) % colourSchemes.length : null
+          special || (typeof special === 'undefined' && Math.random() > 0.9) ? Math.floor(Math.random() * (colourSchemes.length - 0.0001)) : null
         );
+      }
   }
   step(): boolean {
     const [head, heading] = this.#snake.head;
@@ -234,7 +239,6 @@ export class Game {
       this.#score += this.#snake.size * this.speed * (typeof foodAt === 'number' ? 10 : 1);
       this.#food.delete(nextHead);
       this.#grow = false;
-      if (typeof foodAt !== 'undefined') this.addFood();
       if (typeof foodAt === 'number') this.#colour = foodAt;
     } else this.#snake.delete(this.#snake.tail[0]);
     if (this.#snake.size === this.size * this.size) {
@@ -242,6 +246,7 @@ export class Game {
       ++this.size;
       this.reset(true);
     }
+    if (this.#food.size === 0 || (this.#food.size < this.minFood && Math.random() > 0.8)) this.addFood();
     return true;
   }
   food(): ReturnType<(typeof PointMap<number | null>)['prototype']['entries']> {
