@@ -115,6 +115,7 @@ export class Game {
   #colour = 0;
   auto = false;
   #nextTurn: Turn | null = null;
+  #levelUp = false;
   constructor() {
     this.reset();
   }
@@ -139,8 +140,23 @@ export class Game {
   get size(): number {
     return this.#size;
   }
+  get colour() {
+    return this.#colour;
+  }
+  get colourScheme(): [l: number, a: number, b: number][] {
+    return colourSchemes[this.#colour];
+  }
   get minFood(): number {
     return Math.ceil(this.#size ** 2 / 100);
+  }
+  get food(): ReturnType<PointMap<number | null>['entries']> {
+    return this.#food.entries();
+  }
+  get levelUp(): boolean {
+    return this.#levelUp;
+  }
+  get snake(): ReturnType<Snake['segments']> {
+    return this.#snake.segments();
   }
   set size(value: number) {
     this.#size = Math.ceil(Math.max(this.#size, value) / 2) * 2;
@@ -150,6 +166,13 @@ export class Game {
   }
   set wrap(value: boolean) {
     this.#wrap = value;
+  }
+  grow(): void {
+    this.#grow = true;
+  }
+  nextColour(): void {
+    if (this.#colour === colourSchemes.length - 1) this.#colour = 0;
+    else ++this.#colour;
   }
   reset(partial?: boolean): void {
     this.#food.clear();
@@ -168,6 +191,7 @@ export class Game {
     if (!partial) this.#colour = 0;
     if (!partial) this.auto = false;
     this.#nextTurn = null;
+    this.#levelUp = partial ?? false;
   }
   addFood(special?: boolean): void {
     const colour = special || (typeof special === 'undefined' && Math.random() > 0.9) ? Math.floor(Math.random() * (colourSchemes.length - 0.0001)) : null;
@@ -194,6 +218,7 @@ export class Game {
       }
   }
   step(): boolean {
+    this.#levelUp = false;
     const [head, heading] = this.#snake.head;
     if (this.auto) {
       if (this.#nextTurn !== null) {
@@ -229,6 +254,7 @@ export class Game {
           x: head.x + (nextHeading === Heading.East ? 1 : nextHeading === Heading.West ? -1 : 0),
           y: head.y + (nextHeading === Heading.North ? -1 : nextHeading === Heading.South ? 1 : 0),
         };
+
     if ((!this.#wrap && (nextHead.x < 0 || nextHead.x >= this.#size || nextHead.y < 0 || nextHead.y >= this.#size)) || this.#snake.has(nextHead)) {
       this.#dead = true;
       return false;
@@ -249,12 +275,6 @@ export class Game {
     if (this.#food.size === 0 || (this.#food.size < this.minFood && Math.random() > 0.8)) this.addFood();
     return true;
   }
-  food(): ReturnType<(typeof PointMap<number | null>)['prototype']['entries']> {
-    return this.#food.entries();
-  }
-  snake(): ReturnType<(typeof Snake)['prototype']['segments']> {
-    return this.#snake.segments();
-  }
   dump() {
     return {
       food: this.#food.keys().toArray(),
@@ -265,18 +285,5 @@ export class Game {
       size: this.#size,
       dead: this.dead,
     };
-  }
-  grow() {
-    this.#grow = true;
-  }
-  get colour() {
-    return this.#colour;
-  }
-  get colourScheme() {
-    return colourSchemes[this.#colour];
-  }
-  nextColour() {
-    if (this.#colour === colourSchemes.length - 1) this.#colour = 0;
-    else ++this.#colour;
   }
 }

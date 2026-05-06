@@ -6,7 +6,7 @@ Written in TypeScript, React, Tailwind, and canvas2d
 
 ### Running in the browser
 
-- [GitHub Pages deployment](https://idkidk000.github.io/snek/)
+- [GitHub Pages deployment](https://soyaEnjoyer.github.io/snek/)
 
 ### Running the dev server locally
 

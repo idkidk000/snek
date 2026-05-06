@@ -9,10 +9,7 @@ function drawFood(context: CanvasRenderingContext2D, game: Game, scale: number):
   context.shadowOffsetX = 0;
   context.shadowOffsetY = scale / 10;
   context.shadowBlur = scale / 4;
-  for (const [{ x, y }, type] of game
-    .food()
-    .toArray()
-    .toSorted(([a], [b]) => a.y - b.y || a.x - b.x)) {
+  for (const [{ x, y }, type] of game.food.toArray().toSorted(([a], [b]) => a.y - b.y || a.x - b.x)) {
     const gradient = context.createLinearGradient(x * scale, y * scale, (x + 1) * scale, (y + 1) * scale);
     let alpha = 45;
     let beta = 75;
@@ -113,7 +110,7 @@ function headingLabel(heading: Heading | null): string {
 }
 
 function drawSnake(context: CanvasRenderingContext2D, game: Game, scale: number): void {
-  const snake = [...game.snake()];
+  const snake = [...game.snake];
   context.shadowOffsetX = 0;
   context.shadowOffsetY = scale / 5;
 
@@ -298,12 +295,18 @@ export default function App() {
       if (gameRef.current.dead || gameRef.current.paused)
         drawText(
           context,
-          [gameRef.current.dead ? 'Game over' : 'Paused', 'Score', gameRef.current.score.toLocaleString(), `Speed ${gameRef.current.speed}`],
+          [
+            gameRef.current.dead ? 'Game over' : gameRef.current.levelUp ? 'Level up' : 'Paused',
+            'Score',
+            gameRef.current.score.toLocaleString(),
+            `Speed ${gameRef.current.speed}`,
+          ],
           `${2 * scale}px`,
           scale,
           gameRef.current.size / 2 - 0.5,
           gameRef.current.size / 2 - 0.5
         );
+
       if (scoreElemRef.current) scoreElemRef.current.innerText = gameRef.current.score.toLocaleString();
       if (lengthElemRef.current) lengthElemRef.current.innerText = gameRef.current.length.toLocaleString();
       if (speedElemRef.current) speedElemRef.current.innerText = gameRef.current.speed.toLocaleString();
@@ -311,6 +314,7 @@ export default function App() {
       if (autoElemRef.current) autoElemRef.current.innerText = gameRef.current.auto ? 'Auto' : 'Manual';
       if (wrapElemRef.current) wrapElemRef.current.innerText = gameRef.current.wrap ? 'Wrap' : 'Limit';
     }
+
     requestAnimationFrame(step);
 
     return () => controller.abort();

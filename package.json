@@ -15,7 +15,7 @@
     "typescript": "~5.9.3",
     "vite": "^7.3.0"
   },
-  "homepage": "https://github.com/idkidk000/snek",
+  "homepage": "https://github.com/soyaEnjoyer/snek",
   "license": "GPL-3.0-only",
   "name": "snek",
   "private": true,
